@@ -1,5 +1,22 @@
 # GPS Tracker API - Docker Deployment
 
+## Lokal Çalıştırma
+
+```bash
+# Gerekli paketleri yükle
+pip install -r requirements.txt
+
+# API'yi çalıştır
+uvicorn src.app:app --host 0.0.0.0 --port 8000
+
+# Veya reload ile development modunda
+uvicorn src.app:app --host 0.0.0.0 --port 8000 --reload
+```
+
+Erişim: http://localhost:8000/docs
+
+---
+
 ## Hızlı Başlangıç
 
 ### Ön Koşullar

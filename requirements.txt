@@ -1,7 +1,7 @@
 fastapi==0.104.1
 uvicorn[standard]==0.24.0
 websockets==12.0
-sqlalchemy>=2.1.0
+sqlalchemy==2.0.48
 pg8000==1.30.5
 python-dotenv==1.0.0
 pydantic-settings==2.1.0

@@ -1,128 +1,155 @@
-# GPS Tracker 📍
+# GPS Tracker API 📍
 
-WebSocket tabanlı gerçek zamanlı GPS izleme uygulaması. Telefondan GPS konumunu gönder, masaüstünde canlı haritada izle.
+Pure REST API + WebSocket tabanlı gerçek zamanlı GPS izleme sistemi.
+Frontend uygulamalar (web, mobile) bu API'ye bağlanacak.
 
 ## Özellikler
 
-- ✅ WebSocket ile gerçek zamanlı konum güncelleme
-- ✅ Leaflet + OpenStreetMap harita
-- ✅ Birden fazla telefon (device) desteği
+- ✅ REST API endpoints
+- ✅ WebSocket ile gerçek zamanlı konum akışı
 - ✅ PostgreSQL veritabanı
 - ✅ GPX export (Google Earth, Strava vb. ile uyumlu)
-- ✅ Konum doğruluğu, hız, süre takibi
-- ✅ Otomatik yeniden bağlantı
+- ✅ Birden fazla cihaz (device) desteği
+- ✅ Docker + Docker Compose ile deployment
+- ✅ Pydantic BaseSettings ile konfigürasyon
+- ✅ SQLAlchemy ORM + Repository Pattern
 
-## Kurulum
+## Hızlı Başlangıç
 
 ### Gereksinimler
-- Python 3.8+
-- PostgreSQL 12+
+- Python 3.12+
+- PostgreSQL 16 (veya Docker)
 - Git
 
-### Adımlar
+### Lokal Çalıştırma
 
-1. **Repoyu klonla**
 ```bash
+# 1. Repoyu klonla
 git clone <repo_url>
 cd gps_tracker
-```
 
-2. **Virtual environment oluştur**
-```bash
+# 2. Virtual environment oluştur
 python -m venv venv
 source venv/bin/activate  # Linux/Mac
 # VEYA
 venv\Scripts\activate  # Windows
-```
 
-3. **Bağımlılıkları yükle**
-```bash
+# 3. Bağımlılıkları yükle
 pip install -r requirements.txt
+
+# 4. .env ayarla (gerekirse)
+cp .env.example .env
+
+# 5. API'yi çalıştır
+uvicorn src.app:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-4. **`.env` dosyasını ayarla**
+API Docs: http://localhost:8000/docs
+
+### Docker ile Çalıştırma
+
 ```bash
-# .env dosyası zaten hazırlanmış:
-DATABASE_URL=postgresql://postgres:12.34.qw.er.@45.88.137.131:5432/gps
+docker-compose up -d
 ```
 
-5. **Sunucuyu başlat**
-```bash
-uvicorn main:app --reload
-```
-
-Tarayıcıda aç:
-- **Masaüstü (Harita):** http://localhost:8000/
-- **Telefon (GPS Gönderici):** http://localhost:8000/track
-
-## Kullanım
-
-### Telefonda
-1. `http://localhost:8000/track` adresine git
-2. Cihaz adı gir (ör: "Araç-1")
-3. **BAŞLAT** butonuna bas
-4. GPS izni ver
-5. Konum gönderisi başlar
-
-### Masaüstünde
-1. `http://localhost:8000/` adresine git
-2. Canlı haritada rotalı görürsün
-3. Renklendirme her cihaz için benzersiz
-4. **GPX** butonuyla dosya indir
+Bkz. `DOCKER.md` detaylar için.
 
 ## API Endpoints
 
+### REST Endpoints
+
 | Metod | Endpoint | Açıklama |
 |-------|----------|----------|
-| GET | `/` | Harita ekranı (HTML) |
-| GET | `/track` | Telefon ekranı (HTML) |
 | POST | `/api/device?name=X&color=Y` | Yeni cihaz oluştur |
-| GET | `/api/devices` | Tüm cihazlar |
-| GET | `/api/device/{id}/tracks` | Cihazın tüm konumları |
-| GET | `/api/export/gpx/{id}` | GPX dosyası indir |
-| WS | `/ws/{device_id}` | WebSocket (konum gönderimi) |
+| GET | `/api/devices` | Tüm cihazları listele |
+| GET | `/api/device/{device_id}/tracks` | Cihazın GPS kayıtlarını al |
+| GET | `/api/export/gpx/{device_id}` | GPX dosyası indir |
 
-## Veritabanı Şeması
+### WebSocket
 
-### `devices` tablosu
-```sql
-CREATE TABLE devices (
-    id SERIAL PRIMARY KEY,
-    name VARCHAR(255),
-    color VARCHAR(7),
-    created_at TIMESTAMP DEFAULT NOW()
-);
+| Endpoint | Açıklama |
+|----------|----------|
+| `ws://localhost:8000/ws/{device_id}` | Gerçek-zamanlı GPS verisi (device_id=0: dinleme, device_id>0: gönderme) |
+
+### Örnek İstekler
+
+```bash
+# Cihaz oluştur
+curl -X POST "http://localhost:8000/api/device?name=Araç-1&color=%23FF0000"
+
+# Cihazları listele
+curl "http://localhost:8000/api/devices"
+
+# GPS kayıtlarını al
+curl "http://localhost:8000/api/device/1/tracks"
+
+# GPX indir
+curl "http://localhost:8000/api/export/gpx/1" -o device.gpx
 ```
 
-### `gps_tracks` tablosu
-```sql
-CREATE TABLE gps_tracks (
-    id SERIAL PRIMARY KEY,
-    device_id INTEGER REFERENCES devices(id) ON DELETE CASCADE,
-    latitude FLOAT,
-    longitude FLOAT,
-    accuracy FLOAT,
-    timestamp TIMESTAMP DEFAULT NOW()
-);
+### WebSocket Kullanımı
+
+JavaScript örneği:
+```javascript
+const ws = new WebSocket('ws://localhost:8000/ws/1');
+
+ws.onopen = () => {
+  ws.send(JSON.stringify({
+    latitude: 41.0082,
+    longitude: 28.9784,
+    accuracy: 5.2
+  }));
+};
+
+ws.onmessage = (event) => {
+  const update = JSON.parse(event.data);
+  console.log('Location:', update);
+};
 ```
 
-## Deployment (VDS)
+## Proje Yapısı
 
-Bkz. `DEPLOYMENT.md`
-
-## Development
-
-Dosya yapısı:
 ```
-gps-tracker/
-├── main.py              # FastAPI backend
-├── tracker.html         # Telefon ekranı (GPS gönderici)
-├── index.html           # Masaüstü harita ekranı
-├── config.py            # Konfigürasyon
-├── requirements.txt     # Python bağımlılıkları
-├── .env                 # Çevre değişkenleri
-└── .gitignore
+gps_tracker/
+├── src/
+│   ├── app.py                 # FastAPI app
+│   ├── config.py              # Pydantic BaseSettings
+│   ├── datalayer/
+│   │   ├── database.py        # SQLAlchemy setup
+│   │   ├── model/db/
+│   │   │   ├── device.py
+│   │   │   └── gps_track.py
+│   │   └── repository/
+│   │       ├── _base_repository.py
+│   │       ├── device_repository.py
+│   │       └── gps_track_repository.py
+│   ├── routes/
+│   │   ├── device_routes.py
+│   │   └── track_routes.py
+│   └── utils/
+│       └── websocket_manager.py
+├── Dockerfile
+├── docker-compose.yml
+├── requirements.txt
+├── .env.example
+└── README.md
 ```
+
+## Deployment
+
+Docker ile production deployment için:
+
+```bash
+docker-compose up -d
+```
+
+Bkz. `DOCKER.md` detayları için.
+
+## Frontend Uygulamalar
+
+Bu API'ye bağlanacak ayrı repolarda geliştirilecek:
+- **Web Frontend** (React/Vue/Next.js)
+- **Mobile App** (React Native/Flutter)
 
 ## Lisans
 
