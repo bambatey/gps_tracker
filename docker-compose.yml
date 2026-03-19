@@ -1,0 +1,44 @@
+version: '3.9'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: gps_tracker_db
+    environment:
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-12.34.qw.er.}
+      POSTGRES_DB: ${DB_NAME:-gps}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - gps_network
+
+  # FastAPI Application
+  api:
+    build: .
+    container_name: gps_tracker_api
+    environment:
+      DATABASE_URL: postgresql+pg8000://${DB_USER:-postgres}:${DB_PASSWORD:-12.34.qw.er.}@postgres:5432/${DB_NAME:-gps}
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - gps_network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+
+networks:
+  gps_network:
+    driver: bridge
